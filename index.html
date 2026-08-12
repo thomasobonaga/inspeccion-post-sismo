@@ -1,0 +1,71 @@
+<!doctype html><html lang="es"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inspección Post-Sismo — Geovisor MVP v2</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f5f7;color:#17202a}
+header{background:#17365d;color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:center}
+h1{font-size:19px;margin:0}header p{font-size:12px;margin:4px 0 0;opacity:.9}
+#map{height:56vh;min-height:380px}.bar,.badges{background:#fff;padding:10px;display:flex;gap:8px;flex-wrap:wrap}
+button{border:0;border-radius:7px;padding:10px 13px;font-weight:bold;cursor:pointer}.primary{background:#1769aa;color:#fff}.secondary{background:#e6edf4;color:#17365d}.danger{background:#b42318;color:#fff}
+.badge{padding:6px 9px;border-radius:20px;font-size:12px;font-weight:bold}.all{background:#e9eef3}.green{background:#dff3e1}.yellow{background:#fff3c4}.orange{background:#ffe1bf}.red{background:#ffd5d5}
+.panel{background:#fff;padding:18px;margin:12px auto;max-width:980px;border-radius:10px;box-shadow:0 2px 8px #0001}.hidden{display:none}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.full{grid-column:1/-1}label{display:block;font-size:13px;font-weight:bold;margin:5px 0}
+input,select,textarea{width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:6px;font-size:14px}textarea{min-height:80px}
+.checks{display:grid;grid-template-columns:1fr 1fr;gap:7px}.check{font-weight:normal;background:#f7f9fb;padding:8px}.check input{width:auto}
+.status{padding:9px;border-radius:6px;background:#eef6ee;font-size:12px;margin-top:9px}.small{font-size:12px;color:#64748b}
+table{width:100%;border-collapse:collapse;font-size:12px}th,td{padding:8px;border-bottom:1px solid #ddd;text-align:left}
+@media(max-width:650px){.grid,.checks{grid-template-columns:1fr}.full{grid-column:auto}}
+</style></head><body>
+<header><div><h1>Inspección Post-Sismo — Geovisor MVP v2</h1><p>Captura georreferenciada + visualización local</p></div><button class="secondary" onclick="getGPS()">📍 Mi ubicación</button></header>
+<div class="badges"><span class="badge all">Total: <b id="total">0</b></span><span class="badge green">🟢 Sin afectación: <b id="green">0</b></span><span class="badge yellow">🟡 Leve: <b id="yellow">0</b></span><span class="badge orange">🟠 Moderada: <b id="orange">0</b></span><span class="badge red">🔴 Severa: <b id="red">0</b></span></div>
+<div class="bar"><button class="primary" onclick="openForm()">＋ Nueva inspección</button><button class="secondary" onclick="fitAll()">🔎 Ver inspecciones</button><button class="secondary" onclick="demo()">▶ Cargar datos demo</button><button class="secondary" onclick="exportJSON()">⬇ Exportar JSON</button><button class="danger" onclick="clearAll()">Borrar datos</button></div>
+<div id="map"></div>
+
+<section id="formPanel" class="panel hidden"><h2>Nueva inspección</h2>
+<form id="form"><div class="grid">
+<div><label>ID inspección</label><input id="id" readonly></div><div><label>Fecha y hora</label><input id="fecha" readonly></div>
+<div><label>Inspector / voluntario *</label><input id="inspector" required></div><div><label>ID infraestructura</label><input id="infra" placeholder="INS-CALI-001"></div>
+<div class="full"><label>Dirección</label><input id="direccion"></div><div><label>Barrio</label><input id="barrio"></div><div><label>Comuna</label><input id="comuna"></div>
+<div><label>Latitud *</label><input id="lat" readonly required></div><div><label>Longitud *</label><input id="lon" readonly required></div>
+<div class="full"><button type="button" class="secondary" onclick="getGPS()">📍 Obtener GPS</button><div id="gps" class="status">Ubicación pendiente.</div></div>
+<div><label>Tipo</label><select id="tipo"><option>Vivienda</option><option>Edificio residencial</option><option>Comercio</option><option>Institución educativa</option><option>Institución de salud</option><option>Edificio público</option><option>Otra</option></select></div>
+<div><label>Pisos</label><input id="pisos" type="number" min="1"></div><div><label>Uso</label><select id="uso"><option>Residencial</option><option>Comercial</option><option>Institucional</option><option>Mixto</option><option>Otro</option></select></div>
+<div><label>Ocupación</label><select id="ocupacion"><option>Ocupada</option><option>Desocupada</option><option>No determinado</option></select></div>
+<div class="full"><label>Afectaciones observadas</label><div class="checks">
+<label class="check"><input name="af" type="checkbox" value="Fisuras">Fisuras</label><label class="check"><input name="af" type="checkbox" value="Grietas">Grietas</label>
+<label class="check"><input name="af" type="checkbox" value="Desprendimientos">Desprendimientos</label><label class="check"><input name="af" type="checkbox" value="Daño en fachada">Daño en fachada</label>
+<label class="check"><input name="af" type="checkbox" value="Daño en cubierta">Daño en cubierta</label><label class="check"><input name="af" type="checkbox" value="Daño visible en elementos estructurales">Elementos estructurales visibles</label>
+<label class="check"><input name="af" type="checkbox" value="Inclinación/deformación aparente">Inclinación/deformación</label><label class="check"><input name="af" type="checkbox" value="Daño no estructural">Daño no estructural</label>
+</div></div>
+<div><label>Severidad preliminar</label><select id="sev"><option>Por determinar</option><option>Sin afectación aparente</option><option>Leve</option><option>Moderada</option><option>Severa</option></select></div>
+<div><label>Revisión especializada</label><select id="rev"><option>Por determinar</option><option>Sí</option><option>No</option></select></div>
+<div class="full"><label>Descripción observable</label><textarea id="desc" placeholder="Describa lo observado, sin emitir diagnóstico estructural."></textarea></div>
+<div class="full"><label>Fotografías</label><input id="fotos" type="file" accept="image/*" multiple capture="environment"><p class="small">En este MVP se registran los metadatos de las fotos. La siguiente versión puede guardar imágenes en IndexedDB.</p></div>
+<div class="full"><label>Observaciones</label><textarea id="obs"></textarea></div>
+<div><label>Acción recomendada</label><select id="accion"><option>Seguimiento</option><option>Evaluación especializada</option><option>Restricción preventiva de acceso</option><option>Por determinar</option></select></div>
+</div><div style="margin-top:14px"><button class="primary">💾 Guardar y mostrar en mapa</button><button type="button" class="secondary" onclick="closeForm()">Cancelar</button></div>
+</form></section>
+
+<section class="panel"><h2>Registros locales</h2><p class="small">Prototipo: la información queda en el navegador del dispositivo. No se conecta todavía al geovisor real.</p>
+<div style="overflow:auto"><table><thead><tr><th>ID</th><th>Fecha</th><th>Inspector</th><th>Infraestructura</th><th>Severidad</th><th>GPS</th></tr></thead><tbody id="rows"></tbody></table></div></section>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const KEY="post_sismo_mvp_v2";let map,markers=[];
+const $=x=>document.getElementById(x), records=()=>JSON.parse(localStorage.getItem(KEY)||"[]");
+function uid(){return"INS-"+new Date().toISOString().slice(0,10).replaceAll("-","")+"-"+Math.random().toString(36).slice(2,7).toUpperCase()}
+function col(s){return{"Sin afectación aparente":"#2e8b57","Leve":"#e0b000","Moderada":"#e67e22","Severa":"#d62828","Por determinar":"#7b8794"}[s]||"#7b8794"}
+function init(){map=L.map("map").setView([3.4516,-76.532],12);L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:"© OpenStreetMap"}).addTo(map);render();newForm()}
+function popup(x){return"<b>"+x.id+"</b><br><b>Infraestructura:</b> "+(x.infra||"-")+"<br><b>Dirección:</b> "+(x.direccion||"-")+"<br><b>Severidad:</b> <span style='color:"+col(x.sev)+"'><b>"+x.sev+"</b></span><br><b>Afectaciones:</b> "+(x.af.length?x.af.join(", "):"No especificadas")+"<br><b>Inspector:</b> "+x.inspector+"<br><b>Fecha:</b> "+x.fecha}
+function render(){markers.forEach(m=>map.removeLayer(m));markers=[];let a=records(),c={"Sin afectación aparente":0,Leve:0,Moderada:0,Severa:0};a.forEach(x=>{let m=L.circleMarker([x.lat,x.lon],{radius:9,fillColor:col(x.sev),color:"#333",weight:1,fillOpacity:.9}).bindPopup(popup(x)).addTo(map);markers.push(m);if(c[x.sev]!==undefined)c[x.sev]++});$("total").textContent=a.length;$("green").textContent=c["Sin afectación aparente"];$("yellow").textContent=c.Leve;$("orange").textContent=c.Moderada;$("red").textContent=c.Severa;$("rows").innerHTML=a.map(x=>"<tr><td>"+x.id+"</td><td>"+x.fecha+"</td><td>"+x.inspector+"</td><td>"+(x.infra||"-")+"</td><td>"+x.sev+"</td><td>"+x.lat.toFixed(6)+", "+x.lon.toFixed(6)+"</td></tr>").join("")}
+function newForm(){$("form").reset();$("id").value=uid();$("fecha").value=new Date().toLocaleString("es-CO");$("gps").textContent="Ubicación pendiente."}
+function openForm(){newForm();$("formPanel").classList.remove("hidden");$("formPanel").scrollIntoView({behavior:"smooth"})}function closeForm(){$("formPanel").classList.add("hidden")}
+function getGPS(){if(!navigator.geolocation){$("gps").textContent="Geolocalización no disponible.";return}$("gps").textContent="Obteniendo ubicación...";navigator.geolocation.getCurrentPosition(p=>{$("lat").value=p.coords.latitude;$("lon").value=p.coords.longitude;$("gps").textContent="GPS obtenido. Precisión: "+Math.round(p.coords.accuracy)+" m";map.setView([p.coords.latitude,p.coords.longitude],16)},e=>$("gps").textContent="Error GPS: "+e.message,{enableHighAccuracy:true,timeout:15000})}
+$("form").addEventListener("submit",e=>{e.preventDefault();if(!$("lat").value){alert("Obtén primero el GPS.");return}let x={id:$("id").value,fecha:$("fecha").value,inspector:$("inspector").value,infra:$("infra").value,direccion:$("direccion").value,barrio:$("barrio").value,comuna:$("comuna").value,lat:+$("lat").value,lon:+$("lon").value,tipo:$("tipo").value,pisos:$("pisos").value,uso:$("uso").value,ocupacion:$("ocupacion").value,af:[...document.querySelectorAll('input[name="af"]:checked')].map(c=>c.value),sev:$("sev").value,rev:$("rev").value,desc:$("desc").value,fotos:[...$("fotos").files].map(f=>({nombre:f.name,tipo:f.type,tamano:f.size})),obs:$("obs").value,accion:$("accion").value};let a=records();a.push(x);localStorage.setItem(KEY,JSON.stringify(a));render();closeForm();map.setView([x.lat,x.lon],17);markers[markers.length-1].openPopup();alert("Inspección guardada localmente y agregada al mapa.")})
+function fitAll(){if(markers.length)map.fitBounds(L.featureGroup(markers).getBounds().pad(.2))}
+function exportJSON(){let b=new Blob([JSON.stringify(records(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download="inspecciones_post_sismo.json";a.click()}
+function clearAll(){if(confirm("¿Borrar todos los registros locales?")){localStorage.removeItem(KEY);render()}}
+function demo(){let d=[{id:"DEMO-001",fecha:new Date().toLocaleString("es-CO"),inspector:"Voluntario demo",infra:"INS-CALI-001",direccion:"Zona demo 1",lat:3.4516,lon:-76.532,sev:"Moderada",af:["Fisuras","Daño en fachada"]},{id:"DEMO-002",fecha:new Date().toLocaleString("es-CO"),inspector:"Voluntario demo",infra:"INS-CALI-002",direccion:"Zona demo 2",lat:3.43,lon:-76.52,sev:"Severa",af:["Grietas"]},{id:"DEMO-003",fecha:new Date().toLocaleString("es-CO"),inspector:"Voluntario demo",infra:"INS-CALI-003",direccion:"Zona demo 3",lat:3.47,lon:-76.545,sev:"Leve",af:["Vidrios rotos"]}];localStorage.setItem(KEY,JSON.stringify(d));render();fitAll()}
+init();
+</script></body></html>
